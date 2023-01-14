@@ -11,7 +11,12 @@
 #include <helper_functions.h>
 #include <helper_cuda.h>
 
+//Generating input data
+#include "data.h"
+
+//matrix operation using GPU
 #include "matrixOperations.cuh"
+
 
 __global__ void hello(){
     printf("hello\n");
@@ -42,72 +47,71 @@ int main(){
 
   exit(matrix_result);*/
   int block_size = 32;
-
-	dim3 dimsA(5 * 2 * block_size, 5*4*block_size, 1);
-  dim3 dimsB(5*4*block_size, 5 * block_size, 1);
+  dim3 threads(block_size,block_size,1);
   
-    dim3 threads(block_size,block_size,1);
-  dim3 blocks((dimsB.y + block_size - 1) / block_size, (dimsA.x + block_size - 1) / block_size);
-
-  unsigned int size_A = dimsA.x * dimsA.y;
-  unsigned int mem_size_A = sizeof(double) * size_A;
-
-  unsigned int size_B = dimsB.x * dimsB.y;
-  unsigned int mem_size_B = sizeof(double) * size_B;
+  int nSamples=10;
+  int order=6;
   
-  unsigned int size_C = dimsA.x * dimsB.y;
-  unsigned int mem_size_C = sizeof(double) * size_C;
+  //Allocate host x
+  unsigned int mem_size_x = sizeof(double) * nSamples;
+  double *h_x;
+  checkCudaErrors(cudaMallocHost(&h_x, mem_size_x));
   
-    // Allocate host memory
-  double *h_A, *h_B, *h_C, *h_CT;
-  checkCudaErrors(cudaMallocHost(&h_A, mem_size_A));
-  checkCudaErrors(cudaMallocHost(&h_B, mem_size_B));
-  checkCudaErrors(cudaMallocHost(&h_C, mem_size_C));
-  checkCudaErrors(cudaMallocHost(&h_CT, mem_size_C));
+  //Allocate device x
+  double *d_x;
+  checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_x), mem_size_x));
+  /*
+  //constant init x
+  ConstantInit(h_x,nSamples,2);
+  */
+  //Copy x to host
+  checkCudaErrors(cudaMemcpyAsync(d_x, h_x, mem_size_x, cudaMemcpyHostToDevice));
+  cudaDeviceSynchronize();
   
-  // Initialize host memory matrices A and B
-  ConstantInit(h_A, size_A, 1.0f);
-  ConstantInit(h_B, size_B, 5.0f);
-
-	
-
-// Allocate device memory
-  double *d_A, *d_B, *d_C, *d_CT;
-
-  checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_A), mem_size_A));
-  checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_B), mem_size_B));
-  checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_C), mem_size_C));
-  checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_CT), mem_size_C));
+ 
+  //Generate range of x
+  size_t xInitBlocks = (nSamples + block_size - 1) / block_size;
+  xInitRange<<<xInitBlocks, block_size>>>(d_x,-100,100,nSamples);
+  cudaDeviceSynchronize();
   
-    // copy host memory to device
-  checkCudaErrors(
-      cudaMemcpyAsync(d_A, h_A, mem_size_A, cudaMemcpyHostToDevice));
-  checkCudaErrors(
-      cudaMemcpyAsync(d_B, h_B, mem_size_B, cudaMemcpyHostToDevice));
-      
-    matMul<<<blocks,threads>>>(d_A,d_B,d_C,dimsA.x,dimsA.y,dimsB.y);
-    cudaDeviceSynchronize();
-    transpose<<<blocks,threads>>>(d_C,d_CT,dimsA.x,dimsB.y);
-    cudaDeviceSynchronize();
+
+  //Allocate host Vandermonde matrix 
+  dim3 dimsV(order+1,nSamples,1);
+  unsigned int mem_size_V = sizeof(double) * dimsV.x * dimsV.y;
+  double *h_V;
+  checkCudaErrors(cudaMallocHost(&h_V, mem_size_V));
+  
+  
+  //Allocate device Vandermonde matrix 
+  double *d_V;
+  checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_V), mem_size_V));
+  
+  //Copy Vandermonde matrix to device
+  checkCudaErrors(cudaMemcpyAsync(d_V, h_V, mem_size_V, cudaMemcpyHostToDevice));
+  cudaDeviceSynchronize();
+  
+  //Initialize Vandermonde matrix
+  dim3 blocksVandermonde((dimsV.x + block_size - 1) / block_size, (dimsV.y + block_size - 1) / block_size, 1);
+ Vandermonde<<<blocksVandermonde,threads>>>(d_x,d_V,order,nSamples);
+	checkCudaErrors(cudaDeviceSynchronize());
+
     
       // Copy result from device to host
-  checkCudaErrors(
-      cudaMemcpyAsync(h_C, d_C, mem_size_C, cudaMemcpyDeviceToHost));
-  checkCudaErrors(
-      cudaMemcpyAsync(h_CT, d_CT, mem_size_C, cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaDeviceSynchronize());
+    checkCudaErrors(cudaMemcpyAsync(h_x, d_x, mem_size_x, cudaMemcpyDeviceToHost));
+    checkCudaErrors(cudaMemcpyAsync(h_V, d_V, mem_size_V, cudaMemcpyDeviceToHost));
     
-    printf("%f\n",h_C[6*dimsB.y+1]);
-    printf("%f\n",h_CT[1*dimsA.x+6]);
+    checkCudaErrors(cudaDeviceSynchronize());
       
-      
-  checkCudaErrors(cudaFreeHost(h_A));
-  checkCudaErrors(cudaFreeHost(h_B));
-  checkCudaErrors(cudaFreeHost(h_C));
-    checkCudaErrors(cudaFreeHost(h_CT));
-	checkCudaErrors(cudaFree(d_A));
-  checkCudaErrors(cudaFree(d_B));
-  checkCudaErrors(cudaFree(d_C));
-  checkCudaErrors(cudaFree(d_CT));
-
+      for(int i=0;i<nSamples;i++){
+      for(int j=0;j<order+1;j++){
+  	printf("%.2f ",h_V[i*(order+1)+j]);
+  }
+  printf("\n");
+  }
+  
+  checkCudaErrors(cudaFreeHost(h_V));
+    checkCudaErrors(cudaFreeHost(h_x));
+    checkCudaErrors(cudaFree(d_V));
+  checkCudaErrors(cudaFree(d_x));
+  
 }

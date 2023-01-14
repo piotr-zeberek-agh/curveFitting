@@ -122,7 +122,7 @@ template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(float *C, float *A,
 */
 void ConstantInit(double *data, int size, float val) {
   for (int i = 0; i < size; ++i) {
-    data[i] = val+i%10;
+    data[i] = val+i%3;
   }
 }
 
@@ -297,10 +297,33 @@ __global__ void transpose(double* A, double* A_T, int rows, int cols)
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int idy = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (idx < cols && idy < rows) 
-    {
+    if (idx < cols && idy < rows){
         int pos = idy * cols + idx;
         int pos_T = idx * rows + idy;
+        
         A_T[pos_T] = A[pos];
+    }
+}
+
+__global__ void xInitRange(double* x, double start, double end, int size){
+	
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	
+	double step = (end - start)/(size - 1);
+	
+	if(idx < size){
+		x[idx]=start + idx * step;
+	}
+	
+}
+
+__global__ void Vandermonde(double* x, double* V, int order, int size)
+{
+    int row = blockIdx.y * blockDim.y + threadIdx.y; 
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (col < order + 1 && row < size){
+    	int pos = row * (order + 1) + col;
+        V[pos] = pow(x[row],col%(order+1));
     }
 }
