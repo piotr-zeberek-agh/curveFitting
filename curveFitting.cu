@@ -59,22 +59,25 @@ int main(){
   unsigned int mem_size_C = sizeof(double) * size_C;
   
     // Allocate host memory
-  double *h_A, *h_B, *h_C;
+  double *h_A, *h_B, *h_C, *h_CT;
   checkCudaErrors(cudaMallocHost(&h_A, mem_size_A));
   checkCudaErrors(cudaMallocHost(&h_B, mem_size_B));
   checkCudaErrors(cudaMallocHost(&h_C, mem_size_C));
+  checkCudaErrors(cudaMallocHost(&h_CT, mem_size_C));
   
   // Initialize host memory matrices A and B
   ConstantInit(h_A, size_A, 1.0f);
   ConstantInit(h_B, size_B, 5.0f);
 
+	
 
 // Allocate device memory
-  double *d_A, *d_B, *d_C;
+  double *d_A, *d_B, *d_C, *d_CT;
 
   checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_A), mem_size_A));
   checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_B), mem_size_B));
   checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_C), mem_size_C));
+  checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_CT), mem_size_C));
   
     // copy host memory to device
   checkCudaErrors(
@@ -84,20 +87,27 @@ int main(){
       
     matMul<<<blocks,threads>>>(d_A,d_B,d_C,dimsA.x,dimsA.y,dimsB.y);
     cudaDeviceSynchronize();
+    transpose<<<blocks,threads>>>(d_C,d_CT,dimsA.x,dimsB.y);
+    cudaDeviceSynchronize();
     
       // Copy result from device to host
   checkCudaErrors(
       cudaMemcpyAsync(h_C, d_C, mem_size_C, cudaMemcpyDeviceToHost));
+  checkCudaErrors(
+      cudaMemcpyAsync(h_CT, d_CT, mem_size_C, cudaMemcpyDeviceToHost));
   checkCudaErrors(cudaDeviceSynchronize());
     
-    printf("%f\n",h_C[59]);
+    printf("%f\n",h_C[6*dimsB.y+1]);
+    printf("%f\n",h_CT[1*dimsA.x+6]);
       
       
   checkCudaErrors(cudaFreeHost(h_A));
   checkCudaErrors(cudaFreeHost(h_B));
   checkCudaErrors(cudaFreeHost(h_C));
+    checkCudaErrors(cudaFreeHost(h_CT));
 	checkCudaErrors(cudaFree(d_A));
   checkCudaErrors(cudaFree(d_B));
   checkCudaErrors(cudaFree(d_C));
+  checkCudaErrors(cudaFree(d_CT));
 
 }

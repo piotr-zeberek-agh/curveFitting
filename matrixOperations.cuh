@@ -122,7 +122,7 @@ template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(float *C, float *A,
 */
 void ConstantInit(double *data, int size, float val) {
   for (int i = 0; i < size; ++i) {
-    data[i] = val;
+    data[i] = val+i%10;
   }
 }
 
@@ -292,3 +292,15 @@ __global__ void matMul(double *a,double *b, double *c, int m, int k, int n)
     }
 } 
 
+__global__ void transpose(double* A, double* A_T, int rows, int cols)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int idy = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (idx < cols && idy < rows) 
+    {
+        int pos = idy * cols + idx;
+        int pos_T = idx * rows + idy;
+        A_T[pos_T] = A[pos];
+    }
+}
