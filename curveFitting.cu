@@ -11,9 +11,6 @@
 #include <helper_functions.h>
 #include <helper_cuda.h>
 
-//Generating input data
-#include "data.h"
-
 //matrix operation using GPU
 #include "matrixOperations.cuh"
 
@@ -52,6 +49,9 @@ int main(){
   int nSamples=10;
   int order=6;
   
+  cudaStream_t stream;
+  checkCudaErrors(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+  
   //Allocate host x
   unsigned int mem_size_x = sizeof(double) * nSamples;
   double *h_x;
@@ -60,20 +60,21 @@ int main(){
   //Allocate device x
   double *d_x;
   checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_x), mem_size_x));
+  
   /*
   //constant init x
   ConstantInit(h_x,nSamples,2);
   */
+  
   //Copy x to host
-  checkCudaErrors(cudaMemcpyAsync(d_x, h_x, mem_size_x, cudaMemcpyHostToDevice));
+  checkCudaErrors(cudaMemcpyAsync(d_x, h_x, mem_size_x, cudaMemcpyHostToDevice, stream));
   cudaDeviceSynchronize();
   
  
   //Generate range of x
   size_t xInitBlocks = (nSamples + block_size - 1) / block_size;
-  xInitRange<<<xInitBlocks, block_size>>>(d_x,-100,100,nSamples);
-  cudaDeviceSynchronize();
-  
+  xInitRange<<<xInitBlocks, block_size, 0, stream>>>(d_x,-100,100,nSamples);
+  checkCudaErrors(cudaStreamSynchronize(stream));
 
   //Allocate host Vandermonde matrix 
   dim3 dimsV(order+1,nSamples,1);
@@ -87,20 +88,19 @@ int main(){
   checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_V), mem_size_V));
   
   //Copy Vandermonde matrix to device
-  checkCudaErrors(cudaMemcpyAsync(d_V, h_V, mem_size_V, cudaMemcpyHostToDevice));
-  cudaDeviceSynchronize();
+  checkCudaErrors(cudaMemcpyAsync(d_V, h_V, mem_size_V, cudaMemcpyHostToDevice, stream));
   
   //Initialize Vandermonde matrix
   dim3 blocksVandermonde((dimsV.x + block_size - 1) / block_size, (dimsV.y + block_size - 1) / block_size, 1);
- Vandermonde<<<blocksVandermonde,threads>>>(d_x,d_V,order,nSamples);
-	checkCudaErrors(cudaDeviceSynchronize());
+  Vandermonde<<<blocksVandermonde, threads, 0, stream>>>(d_x, d_V, order, nSamples);
+  checkCudaErrors(cudaStreamSynchronize(stream));
 
     
       // Copy result from device to host
-    checkCudaErrors(cudaMemcpyAsync(h_x, d_x, mem_size_x, cudaMemcpyDeviceToHost));
-    checkCudaErrors(cudaMemcpyAsync(h_V, d_V, mem_size_V, cudaMemcpyDeviceToHost));
+    checkCudaErrors(cudaMemcpyAsync(h_x, d_x, mem_size_x, cudaMemcpyDeviceToHost, stream));
+    checkCudaErrors(cudaMemcpyAsync(h_V, d_V, mem_size_V, cudaMemcpyDeviceToHost, stream));
     
-    checkCudaErrors(cudaDeviceSynchronize());
+    checkCudaErrors(cudaStreamSynchronize(stream));
       
       for(int i=0;i<nSamples;i++){
       for(int j=0;j<order+1;j++){
