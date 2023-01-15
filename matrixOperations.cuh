@@ -122,7 +122,7 @@ template <int BLOCK_SIZE> __global__ void MatrixMulCUDA(float *C, float *A,
 */
 void ConstantInit(double *data, int size, float val) {
   for (int i = 0; i < size; ++i) {
-    data[i] = val+i%3;
+    data[i] = val;
   }
 }
 
@@ -277,7 +277,7 @@ cudaStream_t stream;
 }
 */
 
-__global__ void matMul(double *a,double *b, double *c, int m, int k, int n)
+__global__ void matMul(double *A,double *B, double *C, int m, int k, int n)
 { 
     int row = blockIdx.y * blockDim.y + threadIdx.y; 
     int col = blockIdx.x * blockDim.x + threadIdx.x;
@@ -286,9 +286,9 @@ __global__ void matMul(double *a,double *b, double *c, int m, int k, int n)
     
     if( col < n && row < m){
         for(int i = 0; i < k; i++)
-            sum += a[row * k + i] * b[i * n + col];
+            sum += A[row * k + i] * B[i * n + col];
         
-        c[row * n + col] = sum;
+        C[row * n + col] = sum;
     }
 } 
 
@@ -327,3 +327,58 @@ __global__ void Vandermonde(double* x, double* V, int order, int size)
         V[pos] = pow(x[row],col%(order+1));
     }
 }
+
+__global__ void reduceRow(double* ref, double* input, double* output, int size, int current)
+{
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int idy = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if(idx < size && idy < size){
+    	int pos = idy * size + idx; 
+    
+	if(idy == current){
+	    double currentValue = ref[current * size + current];
+	    
+	    if(currentValue){
+		output[pos] = input[pos]/currentValue;
+	    }else{
+	    	printf("Math Error");
+	    }
+	    
+	}else{
+		output[pos] = input[pos];
+	}
+    }
+}
+
+__global__ void substractRow(double* ref, double* input, double* output, int size, int current)
+{
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int idy = blockIdx.y * blockDim.y + threadIdx.y;
+
+
+    if (idx < size && idy < size){
+    	int pos = idy * size + idx;
+    	
+	    if(idy != current){
+	    	double factor = ref[idy*size+current];
+		output[pos] = input[pos] - input[current * size + idx]*factor;
+	    }else{
+	    	output[pos] = input[pos];
+	    }
+    }
+}
+
+__global__ void initIdentityMatrix(double* I, int size)
+{
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int idy = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (idx < size && idy < size){
+        I[idy * size + idx] = (idx==idy ? 1 : 0);
+    }
+}
+
+
+
+
