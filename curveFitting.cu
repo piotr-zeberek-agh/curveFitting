@@ -12,7 +12,7 @@
 #include <helper_cuda.h>
 
 //matrix operation using GPU
-#include "matrixOperations.cuh"
+#include "matrixOperationsGPU.cuh"
 
 #define BLOCK_SIZE 32
 
