@@ -24,42 +24,18 @@ void printMatrix(T *A, int rows, int cols);
 template<typename T>
 void printDeviceMatrix(T* d_A, int rows, int cols);
 
-
-
 int main(){
-	/*printf("[Matrix Multiply Using CUDA] - Starting...\n");
-
-  
-
-  dim3 dimsA(5 * 2 * BLOCK_SIZE, 16, 1);
-  dim3 dimsB(16, 5 * 2 * BLOCK_SIZE, 1);
-
-  if (dimsA.x != dimsB.y) {
-    printf("Error: outer matrix dimensions must be equal. (%d != %d)\n",
-           dimsA.x, dimsB.y);
-    exit(EXIT_FAILURE);
-  }
-
-
-
-  printf("MatrixA(%d,%d), MatrixB(%d,%d)\n", dimsA.x, dimsA.y,
-         dimsB.x, dimsB.y);
-
-  checkCudaErrors(cudaProfilerStart());
-  int matrix_result = MatrixMultiply(BLOCK_SIZE, dimsA, dimsB);
-  checkCudaErrors(cudaProfilerStop());
-
-  exit(matrix_result);*/
+	
   dim3 threads(BLOCK_SIZE,BLOCK_SIZE,1);
-  //dim3 blocks((size + BLOCK_SIZE - 1) / BLOCK_SIZE, (size + BLOCK_SIZE - 1) / BLOCK_SIZE, 1);
   
-  int nSamples=3;
-  int order=6;
+  int nSamples=11;
+  int order=12;
   
+  //Stream for synchronization and timing 
   cudaStream_t stream;
   checkCudaErrors(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
   
-  //Allocate host memory for x,y and B matrix
+  //Allocate Host x,y and B vectors
   double *h_x, *h_y, *h_B;
   
   unsigned int mem_size_samples = sizeof(double) * nSamples;
@@ -69,32 +45,46 @@ int main(){
   unsigned int mem_size_B = sizeof(double) * (order + 1);
   checkCudaErrors(cudaMallocHost(&h_B, mem_size_B));
   
-  //Allocate device x
-  double *d_x;
+  //Put some values into B and print
+  for(int i=0; i<order+1; i++){
+  	h_B[i]=i%3;
+  }
+  
+  printf("B = ");
+  printMatrix(h_B,1,order+1);
+  
+  //Allocate Device x,y and B vectors
+  double *d_x, *d_y, *d_B;
   checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_x), mem_size_samples));
+  checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_y), mem_size_samples));
   
-  /*
-  //constant init x
-  ConstantInit(h_x,nSamples,2);
-  */
-  
-  //Copy x from Host to Device
+  checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_B), mem_size_B));
+   
+  //Copy x,y and B from Host to Device
   checkCudaErrors(cudaMemcpyAsync(d_x, h_x, mem_size_samples, cudaMemcpyHostToDevice, stream));
+  checkCudaErrors(cudaMemcpyAsync(d_y, h_y, mem_size_samples, cudaMemcpyHostToDevice, stream));
   
- 
-  //Generate range of x
+  checkCudaErrors(cudaMemcpyAsync(d_B, h_B, mem_size_B, cudaMemcpyHostToDevice, stream));
+  
+  //Generate range of x and print
+  double start = -5.0f;
+  double stop = 5.0f;
   size_t xInitBlocks = (nSamples + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  xInitRange<<<xInitBlocks, BLOCK_SIZE, 0, stream>>>(d_x,-100,100,nSamples);
+  
+  xInitRange<<<xInitBlocks, BLOCK_SIZE, 0, stream>>>(d_x,start,stop,nSamples);
   checkCudaErrors(cudaStreamSynchronize(stream));
+  
+  printf("x = ");
+  printDeviceMatrix(d_x,1,nSamples);
 
   //Allocate host Vandermonde matrix 
   dim3 dimsV(order+1,nSamples,1);
-  unsigned int mem_size_V = sizeof(double) * dimsV.x * dimsV.y;
+  
   double *h_V;
+  unsigned int mem_size_V = sizeof(double) * dimsV.x * dimsV.y;
   checkCudaErrors(cudaMallocHost(&h_V, mem_size_V));
   
-  
-  //Allocate device Vandermonde matrix 
+  //Allocate device Vandermonde matrix
   double *d_V;
   checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_V), mem_size_V));
   
@@ -106,58 +96,22 @@ int main(){
   Vandermonde<<<blocksVandermonde, threads, 0, stream>>>(d_x, d_V, order, nSamples);
   checkCudaErrors(cudaStreamSynchronize(stream));
   
-  //printDeviceMatrix(d_V,dimsV.y,dimsV.x);
-
-    
-      // Copy result from device to host
-    checkCudaErrors(cudaMemcpyAsync(h_x, d_x, mem_size_samples, cudaMemcpyDeviceToHost, stream));
-    checkCudaErrors(cudaMemcpyAsync(h_V, d_V, mem_size_V, cudaMemcpyDeviceToHost, stream));
-    
-    checkCudaErrors(cudaStreamSynchronize(stream));
-      
-     printDeviceMatrix(h_V,dimsV.y,dimsV.x);
-  
-  //test inverse matrix
-
-  unsigned int mem_size = sizeof(double) * nSamples * nSamples;
-  double *h_A, *h_C;
-  checkCudaErrors(cudaMallocHost(&h_A, mem_size));
-  checkCudaErrors(cudaMallocHost(&h_C, mem_size));
-  
-  ConstantInit(h_A,nSamples*nSamples,2);
-  h_A[2]=5.0;
-  h_A[4]=4.0;
-  h_A[5]=0.0;
-  h_A[8]=1.0;
-  
-  for(int i=0;i<nSamples;i++){
-      for(int j=0;j<nSamples;j++){
-  	printf("%.2f ",h_A[i*nSamples+j]);
-  }
-  printf("\n");
-  }
-  
-  double *d_A, *d_C;
-  checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_A), mem_size));
-  checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_C), mem_size));
-  
-  checkCudaErrors(cudaMemcpyAsync(d_A, h_A, mem_size, cudaMemcpyHostToDevice, stream));
-  checkCudaErrors(cudaMemcpyAsync(d_C, h_C, mem_size, cudaMemcpyHostToDevice, stream));
+  //Calculate y=V*B and print
+  dim3 blocksY((nSamples + BLOCK_SIZE - 1) / BLOCK_SIZE, (dimsV.y + BLOCK_SIZE - 1) / BLOCK_SIZE, 1);
+  matMul<<<blocksY,threads>>>(d_V, d_B, d_y, dimsV.y, dimsV.x, 1);
   checkCudaErrors(cudaStreamSynchronize(stream));
   
-  inverseMatrixGPU(d_A, d_C, nSamples);
+  printf("y = ");
+  printDeviceMatrix(d_y,1,nSamples);
   
-
-  
+  checkCudaErrors(cudaFreeHost(h_x));
+  checkCudaErrors(cudaFreeHost(h_y));
+  checkCudaErrors(cudaFreeHost(h_B));
   checkCudaErrors(cudaFreeHost(h_V));
-    checkCudaErrors(cudaFreeHost(h_x));
-    checkCudaErrors(cudaFreeHost(h_A));
-    checkCudaErrors(cudaFreeHost(h_C));
-    checkCudaErrors(cudaFree(d_V));
   checkCudaErrors(cudaFree(d_x));
-  checkCudaErrors(cudaFree(d_A));
-  checkCudaErrors(cudaFree(d_C));
-  
+  checkCudaErrors(cudaFree(d_y));
+  checkCudaErrors(cudaFree(d_B));
+  checkCudaErrors(cudaFree(d_V));
 }
 
 void inverseMatrixGPU(double *A, double *inv_A, int size){
@@ -214,7 +168,6 @@ void printMatrix(T *A, int rows, int cols){
 		}
 		
 		printf("\n");
-		
 	}
 }
 
@@ -223,9 +176,10 @@ void printDeviceMatrix(T* d_A, int rows, int cols){
 	
 	T *temp;
 	int mem_size = rows * cols * sizeof(T);
+	
 	checkCudaErrors(cudaMallocHost(&temp, mem_size));
 	checkCudaErrors(cudaMemcpyAsync(temp, d_A, mem_size, cudaMemcpyDeviceToHost));
-	cudaDeviceSynchronize();
+	checkCudaErrors(cudaDeviceSynchronize());
 	
 	printMatrix(temp, rows, cols);
 	
