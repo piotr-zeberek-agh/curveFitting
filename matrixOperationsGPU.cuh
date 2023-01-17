@@ -1,4 +1,4 @@
-__global__ void matMul(double *A,double *B, double *C, int m, int k, int n)
+__global__ void matMulGPU(double *A,double *B, double *C, int m, int k, int n)
 { 
     int row = blockIdx.y * blockDim.y + threadIdx.y; 
     int col = blockIdx.x * blockDim.x + threadIdx.x;
@@ -13,7 +13,7 @@ __global__ void matMul(double *A,double *B, double *C, int m, int k, int n)
     }
 } 
 
-__global__ void transpose(double* A, double* A_T, int rows, int cols)
+__global__ void transposeGPU(double* A, double* A_T, int rows, int cols)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int idy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -99,7 +99,4 @@ __global__ void initIdentityMatrix(double* I, int size)
         I[idy * size + idx] = (idx==idy ? 1 : 0);
     }
 }
-
-
-
 
