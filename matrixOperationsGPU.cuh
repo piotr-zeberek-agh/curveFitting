@@ -38,12 +38,12 @@ __global__ void xInitRange(double* x, double start, double end, int size){
 	
 }
 
-__global__ void Vandermonde(double* x, double* V, int order, int size)
+__global__ void Vandermonde(double* x, double* V, int order, int nSamples)
 {
     int row = blockIdx.y * blockDim.y + threadIdx.y; 
     int col = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (col < order + 1 && row < size){
+    if (col < order + 1 && row < nSamples){
     	int pos = row * (order + 1) + col;
         V[pos] = pow(x[row],col%(order+1));
     }
