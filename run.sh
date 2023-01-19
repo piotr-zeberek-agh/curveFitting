@@ -1,5 +1,8 @@
 #!/bin/bash
+
+echo "Compile curveFitting..."
 make "SMS=75"
+
 if [ -f curveFitting ]
 then
 	case $# in
