@@ -1,4 +1,6 @@
-
+#ifndef BLOCK_SIZE
+#define BLOCK_SIZE 32
+#endif
 
 __global__ void xInitRange(double *x, double start, double end, int size)
 {
@@ -39,6 +41,7 @@ __global__ void transpose(double *A, double *A_T, int rows, int cols)
     }
 }
 
+/*
 __global__ void matMul(double *A, double *B, double *C, int m, int k, int n)
 {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
@@ -54,6 +57,55 @@ __global__ void matMul(double *A, double *B, double *C, int m, int k, int n)
         C[row * n + col] = sum;
     }
 }
+
+*/
+__global__ void matMul(double * A, double * B, double * C, int m, int k, int n)
+{
+    //Sub matrices for A and B
+    __shared__ float As[BLOCK_SIZE][BLOCK_SIZE];
+    __shared__ float Bs[BLOCK_SIZE][BLOCK_SIZE];
+
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    int tx = threadIdx.x;
+    int ty = threadIdx.y;
+
+    //Variable for storing partial sum for C 
+    double Csub = 0;
+
+    for (int i = 0; i < (k-1)/BLOCK_SIZE +1; ++i)
+    {
+        //Load matrix A to shared memory
+        if(row < m && i*BLOCK_SIZE+tx < k)
+            As[ty][tx] = A[row*k + i*BLOCK_SIZE+tx];
+        else
+            As[ty][tx] = 0.0f;
+
+        //Load matrix B to shared memory
+        if (i*BLOCK_SIZE+ty < k && col < n)
+            Bs[ty][tx] = B[(i*BLOCK_SIZE+ty)*n + col];
+        else
+            Bs[ty][tx] = 0.0f;
+
+	//Synchronize threads before calculating sum
+        __syncthreads();
+
+        //Calculate partial sum
+        for (int j = 0; j < BLOCK_SIZE; ++j)
+            Csub += As[ty][j] * Bs[j][tx];
+	
+	//Synchronize to unsure calculations are finished
+        __syncthreads();
+
+    }
+    
+    //Copy calculated sum to C matrix
+    if (row < m && col < n)
+        C[row*n+col] = Csub;
+
+}
+
 
 __global__ void initIdentityMatrix(double *I, int size)
 {
