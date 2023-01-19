@@ -15,7 +15,8 @@ Default execution mode is demo. If you want to specify file to read data from an
 ```
 *data.txt* contains 1024 data points generated with 8th order polynomial with coefficients from B<0> to B<8> 
 > 7.4  -3.31  2.11  0.78  -0.4  -5  2.93  -0.001  0.087
-and x ranging from -5 to 5.
+and *x* ranging from -5 to 5. For each *y* value noise was added.
+>noise = random value between +-0.005*y
 
 ## Possible future additions
 * [DONE] Reading (x,y) pairs from data file. (fairly easy)
