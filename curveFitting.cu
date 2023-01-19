@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
 	{
 	case 1: // Demo
 		nSamples = 1024;
-		order = 4;
+		order = 5;
 		printf("Running demo with %d samples and order of %d\n", nSamples, order);
 		demo(nSamples, order);
 		break;
