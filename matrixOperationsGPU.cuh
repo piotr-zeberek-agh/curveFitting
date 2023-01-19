@@ -26,20 +26,6 @@ __global__ void vandermonde(double *x, double *V, int order, int nSamples)
         V[pos] = pow(x[row], col % (order + 1));
     }
 }
-/*
-__global__ void transpose(double *A, double *A_T, int rows, int cols)
-{
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int idy = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if (idx < cols && idy < rows)
-    {
-        int pos = idy * cols + idx;
-        int pos_T = idx * rows + idy;
-
-        A_T[pos_T] = A[pos];
-    }
-}*/
 
 __global__ void transpose(double *A, double *A_T, int rows, int cols)
 {
