@@ -26,7 +26,7 @@ __global__ void vandermonde(double *x, double *V, int order, int nSamples)
         V[pos] = pow(x[row], col % (order + 1));
     }
 }
-
+/*
 __global__ void transpose(double *A, double *A_T, int rows, int cols)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -39,31 +39,48 @@ __global__ void transpose(double *A, double *A_T, int rows, int cols)
 
         A_T[pos_T] = A[pos];
     }
-}
+}*/
 
-/*
-__global__ void matMul(double *A, double *B, double *C, int m, int k, int n)
+__global__ void transpose(double *A, double *A_T, int rows, int cols)
 {
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
+	//Sub matrix for A
+	__shared__ double block[BLOCK_SIZE][BLOCK_SIZE+1];
+	
+	int tx = threadIdx.x;
+	int ty = threadIdx.y;
+	
+	int bx = blockIdx.x;
+	int by = blockIdx.y;
+	
+	//Load matrix A to shared memory
+	int xIndex = bx * BLOCK_SIZE + tx;
+	int yIndex = by * BLOCK_SIZE + ty;
+	
+	if(tx < cols && ty < rows)
+	{
+		int idx = yIndex * cols + xIndex;
+		block[ty][tx] = A[idx];
+	}
 
-    double sum = 0;
+        // synchronise to ensure all data is written
+	__syncthreads();
 
-    if (col < n && row < m)
-    {
-        for (int i = 0; i < k; i++)
-            sum += A[row * k + i] * B[i * n + col];
-
-        C[row * n + col] = sum;
-    }
+	// Write the data from tiles to transposed ouput matrix A_T
+	xIndex = by * BLOCK_SIZE + tx;
+	yIndex = bx * BLOCK_SIZE + ty;
+	
+	if(xIndex < rows && yIndex < cols)
+	{
+		int idx_T = yIndex * rows + xIndex;
+		A_T[idx_T] = block[tx][ty];
+	}
 }
 
-*/
 __global__ void matMul(double * A, double * B, double * C, int m, int k, int n)
 {
     //Sub matrices for A and B
-    __shared__ float As[BLOCK_SIZE][BLOCK_SIZE];
-    __shared__ float Bs[BLOCK_SIZE][BLOCK_SIZE];
+    __shared__ double As[BLOCK_SIZE][BLOCK_SIZE];
+    __shared__ double Bs[BLOCK_SIZE][BLOCK_SIZE];
 
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
@@ -105,7 +122,6 @@ __global__ void matMul(double * A, double * B, double * C, int m, int k, int n)
         C[row*n+col] = Csub;
 
 }
-
 
 __global__ void initIdentityMatrix(double *I, int size)
 {
