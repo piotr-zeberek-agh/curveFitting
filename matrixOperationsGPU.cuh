@@ -15,15 +15,15 @@ __global__ void xInitRange(double *x, double start, double end, int size)
     }
 }
 
-__global__ void vandermonde(double *x, double *V, int order, int nSamples)
+__global__ void vandermonde(double *x, double *V, int degree, int nSamples)
 {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (col < order + 1 && row < nSamples)
+    if (col < degree + 1 && row < nSamples)
     {
-        int pos = row * (order + 1) + col;
-        V[pos] = pow(x[row], col % (order + 1));
+        int pos = row * (degree + 1) + col;
+        V[pos] = pow(x[row], col % (degree + 1));
     }
 }
 

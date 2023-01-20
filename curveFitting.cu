@@ -16,9 +16,9 @@
 
 #define BLOCK_SIZE 32
 
-void demo(int nSamples, int order);
+void demo(int nSamples, int degree);
 
-void regression(double *x, double *y, int nSamples, int order, double *d_V = nullptr);
+void regression(double *x, double *y, int nSamples, int degree, double *d_V = nullptr);
 
 void invertMatrixGPU(double *A, int size);
 
@@ -33,7 +33,7 @@ void printDeviceMatrix(T *d_A, dim3 dims);
 int main(int argc, char *argv[])
 {
 	int nSamples = 0;
-	int order = 0;
+	int degree = 0;
 	size_t mem_size_samples = 0;
 	const char *file_name = nullptr;
 
@@ -41,16 +41,16 @@ int main(int argc, char *argv[])
 	{
 	case 1: // Demo
 		nSamples = 1024;
-		order = 5;
-		printf("Running demo with %d samples and order of %d\n", nSamples, order);
-		demo(nSamples, order);
+		degree = 5;
+		printf("Running demo with %d samples and degree of %d\n", nSamples, degree);
+		demo(nSamples, degree);
 		break;
 
 	case 4: // Read execution parameters
 		file_name = argv[1];
 		nSamples = atoi(argv[2]);
-		order = atoi(argv[3]);
-		printf("Polynomial regression for (x,y) pairs from \"%s\", number of samples: %d, order of polynomial: %d\n", file_name, nSamples, order);
+		degree = atoi(argv[3]);
+		printf("Polynomial regression for (x,y) pairs from \"%s\", number of samples: %d, degree of polynomial: %d\n", file_name, nSamples, degree);
 
 		// Allocate Host x,y vector
 		double *h_x, *h_y;
@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
 		readData(h_x, h_y, file_name, nSamples);
 
 		// Perform regression
-		regression(h_x, h_y, nSamples, order);
+		regression(h_x, h_y, nSamples, degree);
 		break;
 
 	default:
@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 	}
 }
 
-void demo(int nSamples, int order)
+void demo(int nSamples, int degree)
 {
 
 	dim3 threads(BLOCK_SIZE, BLOCK_SIZE, 1);
@@ -81,12 +81,12 @@ void demo(int nSamples, int order)
 
 	// Allocate Host B vector
 	double *h_B;
-	dim3 dimsB(1, order + 1, 1);
+	dim3 dimsB(1, degree + 1, 1);
 	size_t mem_size_B = dimsB.x * dimsB.y * sizeof(double);
 	checkCudaErrors(cudaMallocHost(&h_B, mem_size_B));
 
 	// Put some values into B
-	for (int i = 0; i < order + 1; i++)
+	for (int i = 0; i < degree + 1; i++)
 	{
 		h_B[i] = i % 3;
 	}
@@ -117,13 +117,13 @@ void demo(int nSamples, int order)
 
 	// Allocate device Vandermonde matrix
 	double *d_V;
-	dim3 dimsV(order + 1, nSamples, 1);
+	dim3 dimsV(degree + 1, nSamples, 1);
 	size_t mem_size_V = sizeof(double) * dimsV.x * dimsV.y;
 	checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_V), mem_size_V));
 
 	// Initialize Vandermonde matrix
 	dim3 blocksVandermonde((dimsV.x + BLOCK_SIZE - 1) / BLOCK_SIZE, (dimsV.y + BLOCK_SIZE - 1) / BLOCK_SIZE, 1);
-	vandermonde<<<blocksVandermonde, threads, 0, stream>>>(d_x, d_V, order, nSamples);
+	vandermonde<<<blocksVandermonde, threads, 0, stream>>>(d_x, d_V, degree, nSamples);
 
 	// Calculate y=V*B
 	dim3 blocksY(1, (dimsV.y + BLOCK_SIZE - 1) / BLOCK_SIZE, 1);
@@ -133,14 +133,14 @@ void demo(int nSamples, int order)
 	checkCudaErrors(cudaStreamSynchronize(stream));
 
 	// Perform regression
-	regression(d_x, d_y, nSamples, order, d_V);
+	regression(d_x, d_y, nSamples, degree, d_V);
 
 	// Free memory
 	checkCudaErrors(cudaFreeHost(h_B));
 	checkCudaErrors(cudaFree(d_B));
 }
 
-void regression(double *x, double *y, int nSamples, int order, double *d_V)
+void regression(double *x, double *y, int nSamples, int degree, double *d_V)
 {
 	dim3 threads(BLOCK_SIZE, BLOCK_SIZE, 1);
 
@@ -152,7 +152,7 @@ void regression(double *x, double *y, int nSamples, int order, double *d_V)
 	double *d_x, *d_y;
 
 	// Things needed for dealing with Vandermonde matrix
-	dim3 dimsV(order + 1, nSamples, 1);
+	dim3 dimsV(degree + 1, nSamples, 1);
 	size_t mem_size_V = sizeof(double) * dimsV.x * dimsV.y;
 	dim3 blocksVandermonde((dimsV.x + BLOCK_SIZE - 1) / BLOCK_SIZE, (dimsV.y + BLOCK_SIZE - 1) / BLOCK_SIZE, 1);
 
@@ -172,7 +172,7 @@ void regression(double *x, double *y, int nSamples, int order, double *d_V)
 		checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_V), mem_size_V));
 
 		// Initialize Vandermonde matrix
-		vandermonde<<<blocksVandermonde, threads, 0, stream>>>(d_x, d_V, order, nSamples);
+		vandermonde<<<blocksVandermonde, threads, 0, stream>>>(d_x, d_V, degree, nSamples);
 	}
 	else
 	{
@@ -184,7 +184,7 @@ void regression(double *x, double *y, int nSamples, int order, double *d_V)
 
 	// Allocate Device transposed Vandermonde matrix
 	double *d_V_T;
-	dim3 dimsV_T(nSamples, order + 1, 1);
+	dim3 dimsV_T(nSamples, degree + 1, 1);
 	checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_V_T), mem_size_V));
 
 	// Transpose Vandermonde matrix
@@ -218,7 +218,7 @@ void regression(double *x, double *y, int nSamples, int order, double *d_V)
 
 	// Allocate Device B_est vector
 	double *d_B_est;
-	dim3 dimsB(1, order + 1, 1);
+	dim3 dimsB(1, degree + 1, 1);
 	size_t mem_size_B = sizeof(double) * dimsB.y;
 	checkCudaErrors(cudaMalloc(reinterpret_cast<void **>(&d_B_est), mem_size_B));
 
