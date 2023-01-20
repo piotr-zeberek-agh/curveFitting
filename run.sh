@@ -9,9 +9,9 @@ then
 		2)
 			file=$1
 			nSamples=$(cat $1 | wc -l)
-			order=$2
+			degree=$2
 			
-			./curveFitting $file $nSamples $order
+			./curveFitting $file $nSamples $degree
 			;;
 			
 		0)
