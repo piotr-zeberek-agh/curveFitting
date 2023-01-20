@@ -9,11 +9,11 @@ Just run *run.sh* script in terminal.
 ```
 ./run.sh
 ```
-Default execution mode is demo. If you want to specify file to read data from and order of polynomial just run as below.
+Default execution mode is demo. If you want to specify file to read data from and degree of polynomial just run as below.
 ```
-./run.sh <file> <order>
+./run.sh <file> <degree>
 ```
-*data.txt* contains 1024 data points generated with 8th order polynomial with coefficients from B<sub>0</sub> to B<sub>8</sub> 
+*data.txt* contains 1024 data points generated with 8th degree polynomial with coefficients from B<sub>0</sub> to B<sub>8</sub> 
 ```
  7.4  -3.31  2.11  0.78  -0.4  -5  2.93  -0.001  0.087
 ```
